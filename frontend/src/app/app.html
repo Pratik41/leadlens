@@ -3,12 +3,14 @@
 <main class="page">
   @if (store.stats(); as stats) {
     @if (store.hasLeads()) {
-      @if (stats.latestImport; as batch) { <app-import-banner [batch]="batch" /> }
-      <app-kpis [stats]="stats" />
-      <app-lead-filters />
-      <app-lead-table />
-      <p class="foot">LeadLens reads only public company websites, identifies itself, obeys robots.txt, never solves CAPTCHAs,
-        and never probes mailboxes over SMTP. <button class="link" (click)="reset()">Reset workspace</button></p>
+      <nav class="tabs-nav no-print" aria-label="Sections">
+        <a routerLink="/" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }" queryParamsHandling="preserve">Leads</a>
+        <a routerLink="/today" routerLinkActive="on">Today</a>
+        <a routerLink="/insights" routerLinkActive="on">Insights</a>
+      </nav>
+      <router-outlet />
+      <p class="foot no-print">LeadLens reads only public company websites, identifies itself, obeys robots.txt, never solves
+        CAPTCHAs, and never probes mailboxes over SMTP. <button class="link" (click)="reset()">Reset workspace</button></p>
     } @else {
       <app-empty-state />
     }
@@ -18,6 +20,7 @@
 <app-lead-drawer />
 <app-import-dialog />
 <app-thesis-panel />
+<app-webhook-dialog />
 
 @if (toast.message(); as message) {
   <div class="toast" role="status" aria-live="polite">{{ message }}</div>

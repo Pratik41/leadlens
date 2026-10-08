@@ -16,8 +16,14 @@ public record NextAction(String channel, String label) {
         if (l.getStatus() == LeadStatus.DISQUALIFIED) return new NextAction("skip", "Disqualified");
         if (l.getStatus() == LeadStatus.REPLIED) return new NextAction("call", "Book the intro call");
         if (l.getStatus() == LeadStatus.CONTACTED) {
-            return new NextAction(l.isPhoneValid() ? "call" : "email",
-                l.isPhoneValid() ? "Follow up by phone" : "Send a follow-up email");
+            String how = l.isPhoneValid() ? "by phone" : "by email";
+            java.time.Instant due = l.getFollowUpAt();
+            if (due != null && due.isAfter(java.time.Instant.now())) {
+                String day = java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.US)
+                    .format(due.atZone(java.time.ZoneOffset.UTC));
+                return new NextAction("wait", "Follow up " + how + " on " + day);
+            }
+            return new NextAction(l.isPhoneValid() ? "call" : "email", "Follow up " + how + " (due now)");
         }
         if (l.getEmailStatus() == EmailStatus.VALID) {
             return new NextAction("email", who != null ? "Email " + who + " directly" : "Send the intro email");

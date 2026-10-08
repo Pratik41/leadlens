@@ -46,6 +46,17 @@ import { BriefCard } from './brief-card';
               <button [class.on]="l.status === s" (click)="setStatus(s)">{{ statusLabel[s] }}</button>
             }
           </div>
+          @if (l.status === 'CONTACTED') {
+            <div class="followup">
+              <span>⏳ Next follow-up <b>{{ l.followUpAt ? day(l.followUpAt) : 'not scheduled' }}</b>
+                @if (l.contactedAt) { <small>· first contacted {{ day(l.contactedAt) }}</small> }</span>
+              <span class="btns">
+                <button class="btn sm" (click)="snooze(1)">+1 day</button>
+                <button class="btn sm" (click)="snooze(3)">+3 days</button>
+                <button class="btn sm" (click)="snooze(7)">+1 week</button>
+              </span>
+            </div>
+          }
 
           <div class="card">
             <h3>Why this score</h3>
@@ -158,6 +169,17 @@ export class LeadDrawer {
     } catch (e) {
       this.toast.show((e as Error).message);
     }
+  }
+
+  protected day(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
+  protected async snooze(days: number): Promise<void> {
+    const l = this.lead();
+    if (!l) return;
+    this.store.patchLead(await this.api.updateLead(l.id, { snoozeDays: days }));
+    this.toast.show(`Follow-up moved ${days} day${days === 1 ? '' : 's'} out`);
   }
 
   protected async saveNotes(notes: string): Promise<void> {

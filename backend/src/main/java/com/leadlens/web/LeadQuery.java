@@ -18,8 +18,16 @@ import java.util.Set;
  * The filters shared by the lead table and the exports, so "export" always means
  * "export exactly what I'm looking at".
  */
-public record LeadQuery(String q, String tier, String status, String contact, String state, List<Long> ids,
-                        String sort) {
+public record LeadQuery(String q, String tier, String status, String contact, String state, String industry,
+                        Integer minYears, String signal, List<Long> ids, String sort) {
+
+    public static LeadQuery of(String tier, List<Long> ids) {
+        return new LeadQuery(null, tier, null, null, null, null, null, null, ids, null);
+    }
+
+    public LeadQuery withTier(String newTier) {
+        return new LeadQuery(q, newTier, status, contact, state, industry, minYears, signal, ids, sort);
+    }
 
     private static final Set<String> SORTABLE = Set.of("score", "company", "foundedYear", "employees", "revenueUsd",
         "updatedAt", "state");
@@ -53,6 +61,18 @@ public record LeadQuery(String q, String tier, String status, String contact, St
                 p.add(cb.isFalse(root.get("phoneValid")));
             }
             if (state != null && !state.isBlank()) p.add(cb.equal(cb.upper(root.get("state")), state.trim().toUpperCase(Locale.ROOT)));
+            if (industry != null && !industry.isBlank()) {
+                String like = "%" + industry.trim().toLowerCase(Locale.ROOT) + "%";
+                p.add(cb.or(cb.like(cb.lower(cb.coalesce(root.get("industry"), "")), like),
+                    cb.like(cb.lower(cb.coalesce(root.get("description"), "")), like)));
+            }
+            if (minYears != null && minYears > 0) {
+                p.add(cb.lessThanOrEqualTo(root.get("foundedYear"), java.time.Year.now().getValue() - minYears));
+            }
+            if (signal != null && signal.matches("[A-Z_]{3,40}")) {
+                // signals is a JSON array; codes are upper-case identifiers, so a quoted match is exact
+                p.add(cb.like(cb.coalesce(root.get("signals"), ""), "%\"" + signal + "\"%"));
+            }
             if (ids != null && !ids.isEmpty()) p.add(root.get("id").in(ids));
             return cb.and(p.toArray(Predicate[]::new));
         };

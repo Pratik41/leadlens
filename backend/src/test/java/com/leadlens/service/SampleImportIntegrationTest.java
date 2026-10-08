@@ -32,6 +32,8 @@ class SampleImportIntegrationTest {
     @Autowired LeadIngestService ingest;
     @Autowired LeadRepository leads;
     @Autowired ImportBatchRepository batches;
+    @Autowired InsightsService insights;
+    @Autowired LeadWorkflow workflow;
     @MockBean MailDomainChecker mailDomains;
 
     @Test
@@ -66,5 +68,16 @@ class SampleImportIntegrationTest {
         assertThat(all).filteredOn(l -> l.getEmailStatus() == EmailStatus.DISPOSABLE).hasSize(2);
         assertThat(all).filteredOn(l -> l.getCompany().contains("Franchise")).allMatch(l -> l.getTier() == Tier.X);
         assertThat(all).filteredOn(l -> l.getCompany().startsWith("Metro Facility")).allMatch(l -> l.getTier() == Tier.X);
+
+        InsightsService.Insights report = insights.build();
+        assertThat(report.funnel().get(0).count()).isEqualTo(36);
+        assertThat(report.funnel().get(1).count()).isEqualTo(32);
+        assertThat(report.industries()).isNotEmpty();
+        assertThat(report.recommendations()).extracting(InsightsService.Recommendation::title)
+            .anyMatch(t -> t.startsWith("Start with")).anyMatch(t -> t.contains("retirement"));
+
+        LeadWorkflow.CallList today = workflow.today(java.time.Instant.now(), 10);
+        assertThat(today.followUpsDue()).isEmpty();
+        assertThat(today.startHere()).hasSize(10).allMatch(l -> l.getTier() == Tier.A || l.getTier() == Tier.B);
     }
 }

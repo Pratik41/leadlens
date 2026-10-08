@@ -100,11 +100,9 @@ public class LeadIngestService {
             List<Lead> ordered = new ArrayList<>();
             int created = 0;
             int merged = 0;
-            for (RawLead row : rows) {
-                Lead incoming = toLead(row);
-                if (incoming == null) {
-                    continue;
-                }
+            List<Lead> incomingLeads = rows.stream().map(LeadIngestService::toLead).filter(java.util.Objects::nonNull).toList();
+            Existing existing = Existing.load(leads, incomingLeads);
+            for (Lead incoming : incomingLeads) {
                 String key = dedupKey(incoming);
                 String name = nameKey(incoming);
                 Lead target = byKey.get(key);
@@ -115,7 +113,7 @@ public class LeadIngestService {
                     }
                 }
                 if (target == null) {
-                    target = findExisting(incoming).orElse(null);
+                    target = existing.find(incoming).orElse(null);
                 }
                 if (target == null) {
                     incoming.setBatchId(b.getId());
@@ -222,19 +220,40 @@ public class LeadIngestService {
         return l.getCompanyKey() + "|" + (l.getState() == null ? "" : l.getState().toLowerCase());
     }
 
-    private Optional<Lead> findExisting(Lead l) {
-        if (l.getDomain() != null) {
-            Optional<Lead> byDomain = leads.findFirstByDomain(l.getDomain());
-            if (byDomain.isPresent()) {
-                return byDomain;
+    /**
+     * Leads already in the database that this import could merge into, fetched with a few IN queries
+     * (500 keys each) instead of one or two lookups per row: 4,000 rows used to cost ~8,000 queries.
+     */
+    record Existing(Map<String, Lead> byDomain, Map<String, List<Lead>> byCompanyKey) {
+
+        static Existing load(LeadRepository repo, List<Lead> incoming) {
+            List<String> domains = incoming.stream().map(Lead::getDomain).filter(java.util.Objects::nonNull).distinct().toList();
+            List<String> keys = incoming.stream().map(Lead::getCompanyKey).filter(k -> !k.isEmpty()).distinct().toList();
+            Map<String, Lead> byDomain = new java.util.HashMap<>();
+            Map<String, List<Lead>> byKey = new java.util.HashMap<>();
+            for (int i = 0; i < domains.size(); i += 500) {
+                repo.findByDomainIn(domains.subList(i, Math.min(domains.size(), i + 500)))
+                    .forEach(l -> byDomain.putIfAbsent(l.getDomain(), l));
             }
+            for (int i = 0; i < keys.size(); i += 500) {
+                repo.findByCompanyKeyIn(keys.subList(i, Math.min(keys.size(), i + 500)))
+                    .forEach(l -> byKey.computeIfAbsent(l.getCompanyKey(), k -> new ArrayList<>()).add(l));
+            }
+            return new Existing(byDomain, byKey);
         }
-        if (l.getCompanyKey().isEmpty()) {
-            return Optional.empty();
+
+        /** Same rule as within an import: domain first, else name + state (or name alone when one side has no domain). */
+        Optional<Lead> find(Lead l) {
+            if (l.getDomain() != null && byDomain.containsKey(l.getDomain())) {
+                return Optional.of(byDomain.get(l.getDomain()));
+            }
+            List<Lead> sameName = byCompanyKey.getOrDefault(l.getCompanyKey(), List.of());
+            return sameName.stream()
+                .filter(x -> l.getState() != null
+                    ? l.getState().equalsIgnoreCase(x.getState() == null ? "" : x.getState())
+                    : l.getDomain() == null || x.getDomain() == null)
+                .findFirst();
         }
-        return l.getState() != null
-            ? leads.findFirstByCompanyKeyAndStateIgnoreCase(l.getCompanyKey(), l.getState())
-            : leads.findFirstByCompanyKey(l.getCompanyKey()).filter(x -> l.getDomain() == null || x.getDomain() == null);
     }
 
     /** Fill the blanks of {@code target} from {@code src}; never overwrite a value we already have. */

@@ -1,37 +1,38 @@
 # 2-minute walkthrough script
 
-Target length: 1:50–2:00. Screen-record the app at http://localhost:8080 with an empty workspace.
+Target length: 1:50–2:00. Screen-record the app (http://localhost:8080, or :4300 with `ng serve`) starting from an
+empty workspace (**Reset workspace** at the bottom of the Leads tab).
 
 ---
 
-**0:00 – 0:15 · The problem**
-> "SaaSquatch is great at finding companies. But a raw export is messy: the same business on three rows, emails that
-> bounce, franchises and companies ten times too big. And nothing tells you which owner might actually want to sell.
-> Reps lose hours in spreadsheets before the first call. I built LeadLens, the step between *scraped* and *contacted*."
+**0:00 – 0:12 · The problem**
+> "SaaSquatch finds companies. But a raw export is messy: duplicates, emails that bounce, franchises, companies ten
+> times too big, and nothing tells you which owner might sell. I built LeadLens, the step between *scraped* and
+> *contacted*."
 
-**0:15 – 0:40 · Import and clean** *(click "Try the sample")*
-> "Here's a 36-row SaaSquatch-style export. In a couple of seconds LeadLens mapped the columns automatically, merged
-> three duplicates (including one row with no website, matched by name and state), skipped the empty row, and told me
-> which columns it didn't use. Every email is graded: verified, shared inbox, throwaway or bouncing. Phones are
-> validated too."
+**0:12 – 0:35 · Clean and verify** *(click "Try the sample")*
+> "Thirty-six raw rows. LeadLens mapped the columns, merged three duplicates (one with no website, matched by name
+> and state), skipped the empty row, and graded every email: verified, shared inbox, throwaway or bouncing."
 
-**0:40 – 1:05 · Rank with reasons** *(open the top lead)*
-> "Every lead is scored against my buy box. I'm in acquisition mode, so it rewards what a searcher cares about: 38
-> years in business, family-owned, recurring maintenance revenue, an owner I can name. The score isn't a black box:
-> here are the four components and every reason. The franchise and the 2,400-person company are excluded, and it says
-> why." *(click the Excluded tab briefly)*
+**0:35 – 0:55 · Rank with reasons** *(open Lone Star Comfort)*
+> "Every lead is scored against my buy box. In acquisition mode it rewards what a searcher cares about: 38 years in
+> business, family-owned, recurring maintenance revenue, a named owner. Here's every reason behind the 91. The
+> franchise and the 2,400-person company are excluded, and it says why."
 
-**1:05 – 1:25 · Act** *(scroll to the brief, click "Write the brief")*
-> "For the lead I want, LeadLens writes a one-screen brief: why now, talking points, a call opener and a first email
-> built only from verified facts. With an API key it uses Claude with schema-checked output. I mark it contacted, and
-> export to HubSpot or Salesforce with their native column names plus score, tier and next step."
+**0:55 – 1:12 · Ask your list** *(type: "family-owned HVAC in Texas over 20 years, not contacted")*
+> "I can ask in plain English. Claude turns the question into exact filters (it never touches the data itself), so
+> the answer is precise, removable and exportable."
 
-**1:25 – 1:45 · Live enrichment and ethics** *(Import → Paste websites → two real domains)*
-> "Paste a list of websites and it builds the lead from the company's own site: emails, phone, founding year, owner,
-> signals, each with the sentence it came from. It identifies itself, obeys robots.txt, never solves CAPTCHAs, and
-> never probes mailboxes."
+**1:12 – 1:30 · Act** *(Write the brief → Contacted → Today tab)*
+> "One click writes a brief and first email from verified facts only. I mark it contacted, and LeadLens schedules
+> the follow-up three business days out. The Today tab is my call list: follow-ups due first, then the best
+> untouched leads."
+
+**1:30 – 1:45 · Insights and CRM** *(Insights tab → click a recommendation → Export menu)*
+> "Insights shows the funnel, where Tier A leads concentrate, data quality, and recommendations that open the
+> matching leads. Everything exports to HubSpot or Salesforce, or pushes to Zapier through a webhook."
 
 **1:45 – 2:00 · Architecture and close**
-> "It's an Angular 22 frontend on a Spring Boot / Java 17 API, with PostgreSQL on Neon, Caffeine caching for DNS, robots and crawls, a bounded worker
-> pool, Flyway migrations and a Docker deploy to Render. The value: reps start every morning with a short, verified,
-> ranked list, plus the reason and the first message for each lead."
+> "Angular 22 on a Spring Boot / Java 17 API, PostgreSQL on Neon, Caffeine caching, a bounded crawler that obeys
+> robots.txt and never bypasses CAPTCHAs, 32 tests including a 5,000-row benchmark, and CI building one Docker image.
+> The result: every morning starts with a short, verified, ranked list, the reason for each lead, and the first message."

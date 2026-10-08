@@ -22,7 +22,8 @@ public record LeadView(
     String linkedinUrl, WebsiteStatus websiteStatus, String websiteNote, String description,
     List<Enrichment.Signal> signals, List<String> enrichedFields, int sourceRows, int score, Tier tier,
     String excludedReason, List<ScoreResult.Component> components, List<ScoreResult.Reason> reasons,
-    LeadStatus status, String notes, Brief brief, String briefProvider, boolean processing, NextAction nextAction,
+    LeadStatus status, String notes, Instant contactedAt, Instant followUpAt, Brief brief, String briefProvider,
+    boolean processing, NextAction nextAction,
     Instant updatedAt) {
 
     public static LeadView of(Lead l, List<Enrichment.Signal> signals, ScoreResult score, Brief brief) {
@@ -34,6 +35,7 @@ public record LeadView(
             l.getEnrichedFields() == null ? List.of() : Arrays.asList(l.getEnrichedFields().split(",")),
             l.getSourceRows(), l.getScore(), l.getTier(), l.getExcludedReason(),
             score == null ? List.of() : score.components(), score == null ? List.of() : score.reasons(),
-            l.getStatus(), l.getNotes(), brief, l.getAiProvider(), l.isProcessing(), NextAction.of(l), l.getUpdatedAt());
+            l.getStatus(), l.getNotes(), l.getContactedAt(), l.getFollowUpAt(), brief, l.getAiProvider(), l.isProcessing(),
+            NextAction.of(l), l.getUpdatedAt());
     }
 }

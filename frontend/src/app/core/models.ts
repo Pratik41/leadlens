@@ -9,7 +9,7 @@ export type ExportFormat = 'hubspot' | 'salesforce' | 'full';
 export interface Signal { code: string; label: string; evidence: string; }
 export interface ScoreComponent { key: string; label: string; score: number; weightPercent: number; }
 export interface Reason { positive: boolean; text: string; }
-export interface NextAction { channel: 'email' | 'call' | 'linkedin' | 'research' | 'skip'; label: string; }
+export interface NextAction { channel: 'email' | 'call' | 'linkedin' | 'research' | 'skip' | 'wait'; label: string; }
 
 export interface Brief {
   headline: string;
@@ -55,6 +55,8 @@ export interface Lead {
   reasons: Reason[];
   status: LeadStatus;
   notes?: string;
+  contactedAt?: string;
+  followUpAt?: string;
   brief?: Brief;
   briefProvider?: string;
   processing: boolean;
@@ -121,4 +123,41 @@ export interface LeadFilters {
   sort: string;
   page: number;
   size: number;
+  /** Set by "Ask your list" (or an Insights recommendation); shown as removable chips. */
+  state: string;
+  industry: string;
+  minYears: number | null;
+  signal: string;
 }
+
+export interface CallList { followUpsDue: Lead[]; startHere: Lead[]; followUpsLater: number; }
+
+export interface QueryPlan {
+  q?: string | null;
+  tier?: string | null;
+  status?: string | null;
+  contact?: string | null;
+  state?: string | null;
+  industry?: string | null;
+  minYears?: number | null;
+  signal?: string | null;
+  sort?: string | null;
+  explanation: string;
+}
+export interface AskAnswer { plan: QueryPlan; provider: string; }
+
+export interface FunnelStep { label: string; count: number; detail: string; }
+export interface Segment { name: string; leads: number; tierA: number; tierAB: number; avgScore: number; reachable: number; }
+export interface Quality { label: string; count: number; total: number; }
+export interface Recommendation { kind: 'focus' | 'opportunity' | 'tactic' | 'quality' | 'thesis'; title: string; detail: string; filter: Record<string, string>; }
+export interface Insights {
+  generatedAt: string;
+  mode: 'ACQUISITION' | 'SALES';
+  funnel: FunnelStep[];
+  industries: Segment[];
+  states: Segment[];
+  quality: Quality[];
+  exclusions: Record<string, number>;
+  recommendations: Recommendation[];
+}
+export interface WebhookResult { sent: number; batches: number; lastStatus: number; target: string; }

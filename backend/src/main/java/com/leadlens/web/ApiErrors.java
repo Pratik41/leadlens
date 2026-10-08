@@ -31,6 +31,13 @@ public class ApiErrors {
         return ResponseEntity.badRequest().body(Map.of("error", msg));
     }
 
+    /** An upstream we call (webhook target) failed; the message says which and how. */
+    @ExceptionHandler(IllegalStateException.class)
+    ResponseEntity<Map<String, String>> upstream(IllegalStateException e) {
+        log.warn("Upstream failure: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", String.valueOf(e.getMessage())));
+    }
+
     @ExceptionHandler(NoSuchElementException.class)
     ResponseEntity<Map<String, String>> notFound(NoSuchElementException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));

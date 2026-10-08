@@ -1,0 +1,76 @@
+### LeadLens API walkthrough
+### Run the backend (cd backend && mvn spring-boot:run), then click "Send Request" on each block
+### (VS Code REST Client / IntelliJ HTTP Client), or copy the curl equivalents from the README.
+
+@base = http://localhost:8080
+
+### 1. Load the bundled 36-row SaaSquatch-style export
+POST {{base}}/api/imports/sample
+
+### 2. Watch verification + enrichment finish (status RUNNING -> DONE)
+GET {{base}}/api/imports/latest
+
+### 3. Dashboard numbers: tiers, ready-to-contact, bad contacts caught, duplicates merged
+GET {{base}}/api/stats
+
+### 4. The ranked list: Tier A with a verified personal email
+GET {{base}}/api/leads?tier=A&contact=verified&sort=score,desc
+
+### 5. Ask in plain English -> filters (Claude with ANTHROPIC_API_KEY, rule parser without)
+POST {{base}}/api/leads/ask
+Content-Type: application/json
+
+{ "question": "family-owned HVAC in Texas over 20 years, not contacted" }
+
+### 6. Apply the filters the answer returned
+GET {{base}}/api/leads?industry=HVAC&state=TX&minYears=20&signal=FAMILY_OWNED&status=NEW
+
+### 7. One lead in full: score components, reasons, signals with evidence, next action
+GET {{base}}/api/leads/1
+
+### 8. Write the outreach brief (why now, talking points, first email, call opener)
+POST {{base}}/api/leads/1/brief
+
+### 9. Log a touch: the follow-up is scheduled 3 business days out
+PATCH {{base}}/api/leads/1
+Content-Type: application/json
+
+{ "status": "CONTACTED" }
+
+### 10. Today's call list: due follow-ups first, then the best untouched leads
+GET {{base}}/api/leads/today?limit=10
+
+### 11. Insights: funnel, best segments, data quality, recommendations
+GET {{base}}/api/insights
+
+### 12. Change the buy box: every lead is re-scored, the response shows the tier shift
+PUT {{base}}/api/thesis
+Content-Type: application/json
+
+{
+  "mode": "ACQUISITION",
+  "industries": ["HVAC", "plumbing"],
+  "locations": ["TX", "FL"],
+  "minEmployees": 10, "maxEmployees": 100,
+  "minRevenue": 2000000, "maxRevenue": 20000000,
+  "minYearsInBusiness": 20,
+  "excludeKeywords": ["franchise"]
+}
+
+### 13. Export the current view for HubSpot (CSV download)
+GET {{base}}/api/leads/export?format=hubspot&tier=A,B
+
+### 14. Configure a CRM webhook (Zapier / Make / n8n / HubSpot workflow) and push the view
+PUT {{base}}/api/integrations/webhook
+Content-Type: application/json
+
+{ "url": "https://hooks.zapier.com/hooks/catch/123/abc" }
+
+###
+POST {{base}}/api/integrations/webhook/send?tier=A
+
+### 15. Build leads from websites only (live crawl; obeys robots.txt)
+POST {{base}}/api/imports/websites
+Content-Type: application/json
+
+{ "text": "basecamp.com\nwordpress.org" }

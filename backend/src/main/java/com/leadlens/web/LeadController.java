@@ -8,6 +8,7 @@ import com.leadlens.domain.LeadStatus;
 import com.leadlens.export.CrmExporter;
 import com.leadlens.service.LeadProcessor;
 import com.leadlens.service.LeadScoring;
+import com.leadlens.service.LeadWorkflow;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +29,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -43,9 +45,11 @@ public class LeadController {
     private final BriefService briefs;
     private final LeadProcessor processor;
     private final ImportBatchRepository batches;
+    private final LeadWorkflow workflow;
 
     public LeadController(LeadRepository leads, LeadScoring scoring, BriefService briefs, LeadProcessor processor,
-                          ImportBatchRepository batches) {
+                          ImportBatchRepository batches, LeadWorkflow workflow) {
+        this.workflow = workflow;
         this.batches = batches;
         this.leads = leads;
         this.scoring = scoring;
@@ -56,12 +60,10 @@ public class LeadController {
     public record PageView(List<LeadView> items, long total, int page, int size) {
     }
 
+    /** Filters bind from query parameters: q, tier, status, contact, state, industry, minYears, signal, ids, sort. */
     @GetMapping
-    public PageView list(@RequestParam(required = false) String q, @RequestParam(required = false) String tier,
-                         @RequestParam(required = false) String status, @RequestParam(required = false) String contact,
-                         @RequestParam(required = false) String state, @RequestParam(required = false) String sort,
-                         @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
-        LeadQuery query = new LeadQuery(q, tier, status, contact, state, null, sort);
+    public PageView list(LeadQuery query, @RequestParam(defaultValue = "0") int page,
+                         @RequestParam(defaultValue = "50") int size) {
         int s = Math.max(1, Math.min(size, 200));
         Page<Lead> result = leads.findAll(query.spec(), PageRequest.of(Math.max(0, page), s, query.sortOrder()));
         return new PageView(result.getContent().stream().map(this::view).toList(), result.getTotalElements(),
@@ -73,15 +75,32 @@ public class LeadController {
         return view(find(id));
     }
 
-    public record LeadUpdate(LeadStatus status, String notes) {
+    /** snoozeDays moves the follow-up to that many days from now (0 = clear it). */
+    public record LeadUpdate(LeadStatus status, String notes, Integer snoozeDays) {
     }
 
     @PatchMapping("/{id}")
     public LeadView update(@PathVariable long id, @RequestBody LeadUpdate update) {
         Lead l = find(id);
-        if (update.status() != null) l.setStatus(update.status());
+        Instant now = Instant.now();
+        if (update.status() != null) workflow.applyStatus(l, update.status(), now);
         if (update.notes() != null) l.setNotes(update.notes().length() > 4000 ? update.notes().substring(0, 4000) : update.notes());
+        if (update.snoozeDays() != null) {
+            if (update.snoozeDays() < 0 || update.snoozeDays() > 365) throw new IllegalArgumentException("Snooze 0–365 days.");
+            l.setFollowUpAt(update.snoozeDays() == 0 ? null : now.plus(java.time.Duration.ofDays(update.snoozeDays())));
+        }
         return view(leads.save(l));
+    }
+
+    public record CallListView(List<LeadView> followUpsDue, List<LeadView> startHere, long followUpsLater) {
+    }
+
+    /** Today's work queue: overdue follow-ups, then the best reachable leads nobody has contacted yet. */
+    @GetMapping("/today")
+    public CallListView today(@RequestParam(defaultValue = "15") int limit) {
+        LeadWorkflow.CallList list = workflow.today(Instant.now(), Math.max(1, Math.min(limit, 50)));
+        return new CallListView(list.followUpsDue().stream().map(this::view).toList(),
+            list.startHere().stream().map(this::view).toList(), list.followUpsLater());
     }
 
     public record BulkUpdate(List<Long> ids, LeadStatus status) {
@@ -94,7 +113,8 @@ public class LeadController {
             throw new IllegalArgumentException("Choose at least one lead and a status.");
         }
         List<Lead> found = leads.findAllById(update.ids());
-        found.forEach(l -> l.setStatus(update.status()));
+        Instant now = Instant.now();
+        found.forEach(l -> workflow.applyStatus(l, update.status(), now));
         leads.saveAll(found);
         return Map.of("updated", found.size());
     }
@@ -126,19 +146,15 @@ public class LeadController {
 
     /** Same filters as the table; Tier X (excluded) leads are left out unless asked for explicitly. */
     @GetMapping("/export")
-    public void export(@RequestParam(defaultValue = "hubspot") String format,
-                       @RequestParam(required = false) String q, @RequestParam(required = false) String tier,
-                       @RequestParam(required = false) String status, @RequestParam(required = false) String contact,
-                       @RequestParam(required = false) String state, @RequestParam(required = false) List<Long> ids,
-                       @RequestParam(required = false) String sort, HttpServletResponse response) throws IOException {
+    public void export(@RequestParam(defaultValue = "hubspot") String format, LeadQuery filters,
+                       HttpServletResponse response) throws IOException {
         CrmExporter.Format f;
         try {
             f = CrmExporter.Format.valueOf(format.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unknown export format: " + format);
         }
-        String tiers = tier == null || tier.isBlank() ? "A,B,C" : tier;
-        LeadQuery query = new LeadQuery(q, tiers, status, contact, state, ids, sort);
+        LeadQuery query = filters.tier() == null || filters.tier().isBlank() ? filters.withTier("A,B,C") : filters;
         List<Lead> rows = leads.findAll(query.spec(), query.sortOrder());
         response.setContentType("text/csv; charset=UTF-8");
         response.setHeader("Content-Disposition", "attachment; filename=\"leadlens-" + f.name().toLowerCase(Locale.ROOT)

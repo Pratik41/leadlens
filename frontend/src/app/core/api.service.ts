@@ -2,7 +2,8 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, firstValueFrom, throwError } from 'rxjs';
 import {
-  ExportFormat, ImportBatch, Lead, LeadFilters, LeadPage, LeadStatus, RescoreOutcome, Stats, Thesis,
+  AskAnswer, CallList, ExportFormat, ImportBatch, Insights, Lead, LeadFilters, LeadPage, LeadStatus, RescoreOutcome, Stats,
+  Thesis, WebhookResult,
 } from './models';
 
 /** Thin typed client for the LeadLens REST API. Errors surface the server's {"error": "..."} message. */
@@ -22,7 +23,32 @@ export class ApiService {
     return this.call(this.http.get<Lead>(`/api/leads/${id}`));
   }
 
-  updateLead(id: number, change: { status?: LeadStatus; notes?: string }): Promise<Lead> {
+  today(limit = 15): Promise<CallList> {
+    return this.call(this.http.get<CallList>('/api/leads/today', { params: { limit } }));
+  }
+
+  ask(question: string): Promise<AskAnswer> {
+    return this.call(this.http.post<AskAnswer>('/api/leads/ask', { question }));
+  }
+
+  insights(): Promise<Insights> {
+    return this.call(this.http.get<Insights>('/api/insights'));
+  }
+
+  webhook(): Promise<{ url: string | null }> {
+    return this.call(this.http.get<{ url: string | null }>('/api/integrations/webhook'));
+  }
+
+  saveWebhook(url: string): Promise<{ url: string | null }> {
+    return this.call(this.http.put<{ url: string | null }>('/api/integrations/webhook', { url }));
+  }
+
+  sendWebhook(f: Partial<LeadFilters>): Promise<WebhookResult> {
+    return this.call(this.http.post<WebhookResult>('/api/integrations/webhook/send', null,
+      { params: params({ ...f, page: undefined, size: undefined }) }));
+  }
+
+  updateLead(id: number, change: { status?: LeadStatus; notes?: string; snoozeDays?: number }): Promise<Lead> {
     return this.call(this.http.patch<Lead>(`/api/leads/${id}`, change));
   }
 

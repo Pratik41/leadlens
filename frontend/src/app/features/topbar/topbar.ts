@@ -29,6 +29,7 @@ import { ExportFormat } from '../../core/models';
               <button role="menuitem" (click)="export('hubspot')">HubSpot CSV <small>contacts + companies import</small></button>
               <button role="menuitem" (click)="export('salesforce')">Salesforce CSV <small>Lead import wizard</small></button>
               <button role="menuitem" (click)="export('full')">Full CSV <small>every field, reasons, next action</small></button>
+              <button role="menuitem" (click)="menuOpen.set(false); store.webhookOpen.set(true)">Send to CRM webhook… <small>Zapier · Make · n8n · HubSpot workflow</small></button>
             </div>
           }
         </div>

@@ -10,8 +10,22 @@ Upload a lead export (or paste a list of websites). In a few seconds LeadLens:
 4. **Ranks**: scores every lead 0–100 against *your* buy box or ideal customer profile, assigns a tier (A work first · B · C · X excluded with a stated reason), and shows every reason behind the number.
 5. **Acts**: suggests the next step per lead, writes a one-screen outreach brief and first email (Claude, with a template fallback), tracks pipeline status and notes, and exports to **HubSpot** or **Salesforce** import format.
 
+On top of the ranked list:
+
+| | Feature | What it does |
+|---|---|---|
+| ✦ | **Ask your list** | Type *"family-owned HVAC in Texas over 20 years, not contacted"*. Claude (or an offline rule parser) turns it into exact, removable filters. The model only writes filters and never sees or invents lead data. |
+| ⏳ | **Today's call list** | Due follow-ups first, then the best reachable leads nobody has touched. Logging a touch schedules the next follow-up 3 business days out (skipping weekends), with one-click snooze. |
+| 📊 | **Insights report** | Funnel (rows → companies → reachable → A/B → contacted → replied), best industries and states, data-quality profile, exclusion reasons, and plain-English recommendations that open the matching leads. Prints to PDF. |
+| 🔗 | **CRM webhook** | Push the current view as JSON batches to Zapier / Make / n8n / a HubSpot workflow; SSRF-guarded like the crawler. |
+
 ![Lead table](docs/screenshots/leads.png)
+![Insights report](docs/screenshots/insights.png)
 ![Lead detail with score breakdown and outreach brief](docs/screenshots/lead-detail.png)
+![Today's call list](docs/screenshots/today.png)
+
+**Submission extras:** [2-minute video script](docs/VIDEO_SCRIPT.md) · [API walkthrough (`.http`)](docs/api-demo.http) ·
+[Business Understanding answers](docs/BUSINESS_UNDERSTANDING.md)
 
 ---
 
@@ -106,7 +120,7 @@ PostgreSQL (Neon, serverless) in production · H2 file DB locally
 | AI | Anthropic Java SDK, `claude-opus-5-5`, structured outputs (JSON schema from the `Brief` record) | Schema-checked output, no parsing hacks; server-side refusal fallback enabled |
 | Caching | Caffeine in-memory: MX results 24 h, robots.txt 6 h, website enrichment 24 h per domain; briefs persisted on the lead | A 2,000-row import touches a few hundred domains, and gmail.com is looked up once |
 | Concurrency | Fixed pool (6 workers) + queue; network I/O outside DB transactions; optimistic locking with retry | Polite to target sites, never blocks the UI, safe against concurrent edits |
-| Performance | Batched JPA inserts (100), indexes on domain / company key / tier+score / status, pre-score on import | Rows appear within a second; enrichment streams in with a progress bar |
+| Performance | Dedup matches pre-loaded with `IN` queries (500 keys each) instead of 1–2 lookups per row; indexes on domain / company key / tier+score / status / follow-up date; pre-score on import | Measured below; rows appear before enrichment finishes, with a progress bar |
 | Hosting (target) | **Render** Docker web service (always-on container, not serverless: the worker pool needs a long-lived process) + **Neon** serverless Postgres; both on **AWS** (us-east) | Simple, cheap, git-push deploys |
 | Deployment | GitHub Actions (Angular build, `mvn verify`, Docker build) → Render auto-deploys `main` from the `Dockerfile` (`render.yaml` blueprint) | Every deploy is tested |
 | Scale-up path | Serve `frontend/` from a CDN (Vercel / S3 + CloudFront) and the API separately | Only needed when traffic justifies two deploys |
@@ -149,8 +163,20 @@ docker compose up --build      # app + Postgres 16 on http://localhost:8080
 (`jdbc:postgresql://<host>/<db>?sslmode=require`), `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` and
 optionally `ANTHROPIC_API_KEY`. Flyway creates the schema on first boot. The health check is `/actuator/health`.
 
-**Tests:** `cd backend && mvn test` runs unit tests for parsing, normalization, verification, robots.txt, extraction, scoring,
-SSRF and export safety, plus an end-to-end import of the sample (offline: DNS mocked, crawler off).
+**Tests:** `cd backend && mvn test` runs 32 tests: parsing, normalization, verification, robots.txt, extraction,
+scoring, SSRF and export safety, the plain-English query parser (including sanitising model output), follow-up
+scheduling, webhook payloads, an end-to-end import of the sample with insights and the call list, and a scale
+benchmark. All run offline (DNS mocked, crawler off).
+
+**Measured at scale** (`ScaleBenchmarkTest`, 5,000-row export with 1,000 duplicates, H2, laptop):
+
+| Step | Before tuning | After |
+|---|---|---|
+| Parse, dedup, pre-score and save 4,000 companies | 12.3 s | **4.5 s** |
+| Plus verification and final scoring of every lead | 19.2 s | **13.4 s** |
+
+The fix was loading dedup candidates in bulk (`IN` queries) instead of querying per row. Next lever: sequence-based
+IDs so Hibernate can batch the inserts.
 
 ### Configuration (`application.yml` or environment)
 
@@ -181,6 +207,14 @@ SSRF and export safety, plus an end-to-end import of the sample (offline: DNS mo
 | GET | `/api/leads/export?format=hubspot\|salesforce\|full&…same filters` | CSV export |
 | GET / PUT | `/api/thesis` | Read / save the buy box (re-scores everything) |
 | GET | `/api/stats` | Dashboard numbers |
+| POST | `/api/leads/ask` `{"question": "…"}` | Plain-English question → filters (`industry`, `minYears`, `signal`, `state`, …) |
+| GET | `/api/leads/today?limit=15` | Call list: due follow-ups, then the best untouched leads |
+| PATCH | `/api/leads/{id}` `{"snoozeDays": 3}` | Move a follow-up (0 clears it) |
+| GET | `/api/insights` | Funnel, segments, data quality, recommendations |
+| GET / PUT | `/api/integrations/webhook` `{"url": "https://…"}` | CRM webhook target |
+| POST | `/api/integrations/webhook/send?…same filters` | Push the current view as JSON batches |
+
+A runnable walkthrough of every call is in [`docs/api-demo.http`](docs/api-demo.http).
 
 Example:
 
@@ -198,6 +232,7 @@ curl -o hubspot.csv "localhost:8080/api/leads/export?format=hubspot&tier=A,B"
   and can be re-checked). Next: a durable queue (Postgres `SKIP LOCKED` or SQS).
 * MX lookups prove a domain accepts mail, not that a specific mailbox exists. Next: plug in a verification API
   (ZeroBounce/NeverBounce) behind the existing `MailDomainChecker` interface.
-* Single-user workspace. Next: accounts, saved views, and a native HubSpot/Salesforce push via their APIs.
+* Single-user workspace. Next: accounts and saved views; CRM sync today is CSV + webhook, next is native
+  HubSpot/Salesforce API push with two-way status sync (replies flowing back into the call list).
 * Signal detection is keyword-based with evidence. Next: let Claude classify the crawled text for subtler
   signals, using the same evidence format.

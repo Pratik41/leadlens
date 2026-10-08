@@ -13,6 +13,10 @@ public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificat
 
     Optional<Lead> findFirstByDomain(String domain);
 
+    List<Lead> findByDomainIn(java.util.Collection<String> domains);
+
+    List<Lead> findByCompanyKeyIn(java.util.Collection<String> companyKeys);
+
     Optional<Lead> findFirstByCompanyKeyAndStateIgnoreCase(String companyKey, String state);
 
     Optional<Lead> findFirstByCompanyKey(String companyKey);
@@ -37,6 +41,9 @@ public interface LeadRepository extends JpaRepository<Lead, Long>, JpaSpecificat
         + " com.leadlens.domain.EmailStatus.UNVERIFIED) or l.phoneValid = true)"
         + " and l.status in (com.leadlens.domain.LeadStatus.NEW, com.leadlens.domain.LeadStatus.QUALIFIED)")
     long countReadyToContact();
+
+    @Query("select distinct l.industry from Lead l where l.industry is not null")
+    List<String> distinctIndustries();
 
     @Query("select count(l) from Lead l where l.enrichedFields is not null")
     long countEnriched();

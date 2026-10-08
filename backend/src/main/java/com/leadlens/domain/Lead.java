@@ -73,6 +73,9 @@ public class Lead {
     private String notes;
     private String aiBrief;
     private String aiProvider;
+    private Instant contactedAt;
+    /** When the next touch is due; set automatically when a lead is marked CONTACTED. */
+    private Instant followUpAt;
     /** True while verification/enrichment is running for this lead. */
     private boolean processing;
     @Column(nullable = false)
@@ -160,6 +163,10 @@ public class Lead {
     public void setAiBrief(String aiBrief) { this.aiBrief = aiBrief; }
     public String getAiProvider() { return aiProvider; }
     public void setAiProvider(String aiProvider) { this.aiProvider = aiProvider; }
+    public Instant getContactedAt() { return contactedAt; }
+    public void setContactedAt(Instant contactedAt) { this.contactedAt = contactedAt; }
+    public Instant getFollowUpAt() { return followUpAt; }
+    public void setFollowUpAt(Instant followUpAt) { this.followUpAt = followUpAt; }
     public boolean isProcessing() { return processing; }
     public void setProcessing(boolean processing) { this.processing = processing; }
     public Instant getCreatedAt() { return createdAt; }

@@ -29,7 +29,7 @@ export const STATUS_LABEL: Record<LeadStatus, string> = {
 export const STATUSES = Object.keys(STATUS_LABEL) as LeadStatus[];
 
 export const CHANNEL_ICON: Record<NextAction['channel'], string> = {
-  email: '✉', call: '☎', linkedin: 'in', research: '🔎', skip: '⦸',
+  email: '✉', call: '☎', linkedin: 'in', research: '🔎', skip: '⦸', wait: '⏳',
 };
 
 export function money(v?: number | null): string | null {
