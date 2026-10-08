@@ -22,6 +22,7 @@ import java.util.Locale;
  *  - obeys robots.txt (cached per host for 6 hours),
  *  - refuses private/internal addresses on every hop (AddressGuard),
  *  - recognises CAPTCHA / bot-check pages and stops there (no solving, no evasion),
+ *  - on HTTP 429/503 honours Retry-After once (up to 10 s) instead of retrying blindly or rotating IPs,
  *  - caps time (connect + read) and size (pages over maxBytes are cut, not buffered),
  *  - only reads HTML.
  */
@@ -37,6 +38,9 @@ public class SafeFetcher {
     }
 
     private static final int MAX_REDIRECTS = 4;
+    private static final long MAX_RETRY_AFTER_MS = 10_000;
+    /** Used when a 429/503 has no Retry-After header. */
+    private static final long DEFAULT_RETRY_MS = 2_000;
 
     private final HttpClient http;
     private final String userAgent;
@@ -62,6 +66,7 @@ public class SafeFetcher {
 
     public Result fetchPage(URI uri) {
         URI current = uri;
+        boolean retried = false;
         for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
             String reject = AddressGuard.rejectReason(current);
             if (reject != null) {
@@ -105,7 +110,20 @@ public class SafeFetcher {
                     return new Result(Outcome.CHALLENGED, current, status, null,
                         "Behind a bot check / CAPTCHA (HTTP " + status + "); not bypassed");
                 }
-                return new Result(Outcome.HTTP_ERROR, current, status, null, "HTTP " + status);
+                // Rate limited: honour the site's Retry-After once (if it asks for 10 s or less), never hammer it
+                if ((status == 429 || status == 503) && !retried) {
+                    long waitMs = retryAfterMs(response.headers().firstValue("retry-after").orElse(null));
+                    if (waitMs >= 0 && waitMs <= MAX_RETRY_AFTER_MS) {
+                        retried = true;
+                        sleep(waitMs);
+                        hop--; // same URL again; not a redirect hop
+                        continue;
+                    }
+                    return new Result(Outcome.HTTP_ERROR, current, status, null,
+                        "Rate limited (HTTP " + status + "); asked to wait longer than we will, skipped politely");
+                }
+                return new Result(Outcome.HTTP_ERROR, current, status, null,
+                    retried ? "Still rate limited after waiting (HTTP " + status + ")" : "HTTP " + status);
             }
             String type = response.headers().firstValue("content-type").orElse("text/html").toLowerCase(Locale.ROOT);
             if (!type.contains("html")) {
@@ -164,6 +182,31 @@ public class SafeFetcher {
     private static String pathOf(URI uri) {
         String path = uri.getRawPath() == null || uri.getRawPath().isEmpty() ? "/" : uri.getRawPath();
         return uri.getRawQuery() == null ? path : path + "?" + uri.getRawQuery();
+    }
+
+    /** Retry-After as delta-seconds or an HTTP date; -1 if unparseable. */
+    static long retryAfterMs(String header) {
+        if (header == null || header.isBlank()) return DEFAULT_RETRY_MS;
+        String h = header.trim();
+        try {
+            return Math.max(0, Long.parseLong(h) * 1000);
+        } catch (NumberFormatException ignored) {
+            // not delta-seconds; try the HTTP-date form
+        }
+        try {
+            java.time.ZonedDateTime when = java.time.ZonedDateTime.parse(h, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME);
+            return Math.max(0, java.time.Duration.between(java.time.Instant.now(), when.toInstant()).toMillis());
+        } catch (java.time.format.DateTimeParseException e) {
+            return -1;
+        }
+    }
+
+    private static void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static String describe(IOException e) {

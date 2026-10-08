@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ApiService } from '../../core/api.service';
 import { LeadStore } from '../../core/lead-store';
 import { ExportFormat } from '../../core/models';
+import { ThemeService } from '../../core/theme.service';
 
 @Component({
   selector: 'app-topbar',
@@ -18,7 +19,10 @@ import { ExportFormat } from '../../core/models';
       </div>
       <div class="top-actions">
         <button class="thesis-pill" (click)="store.thesisOpen.set(true)" title="Edit what a great lead looks like">
-          <span class="dot"></span><span>{{ thesisLabel() }}</span>
+          <span class="dot"></span><span class="long">{{ thesisLabel() }}</span><span class="short">Buy box</span>
+        </button>
+        <button class="btn icon-only" (click)="theme.cycle()" [title]="themeTitle()" [attr.aria-label]="themeTitle()">
+          <span aria-hidden="true">{{ themeIcon() }}</span>
         </button>
         <div class="menu-wrap">
           <button class="btn" aria-haspopup="true" [attr.aria-expanded]="menuOpen()"
@@ -33,7 +37,7 @@ import { ExportFormat } from '../../core/models';
             </div>
           }
         </div>
-        <button class="btn primary" (click)="store.importOpen.set('csv')">+ Import leads</button>
+        <button class="btn primary" (click)="store.importOpen.set('csv')">+ Import<span class="long"> leads</span></button>
       </div>
     </header>`,
 })
@@ -41,6 +45,13 @@ export class Topbar {
   protected readonly store = inject(LeadStore);
   private readonly api = inject(ApiService);
   protected readonly menuOpen = signal(false);
+  protected readonly theme = inject(ThemeService);
+  protected readonly themeIcon = computed(() => ({ system: '◐', light: '☀', dark: '☾' })[this.theme.mode()]);
+  protected readonly themeTitle = computed(() => ({
+    system: 'Theme: follows your system (click for light)',
+    light: 'Theme: light (click for dark)',
+    dark: 'Theme: dark (click to follow your system)',
+  })[this.theme.mode()]);
 
   protected readonly thesisLabel = computed(() => {
     const t = this.store.thesis();

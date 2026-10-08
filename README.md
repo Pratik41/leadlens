@@ -24,6 +24,10 @@ On top of the ranked list:
 ![Lead detail with score breakdown and outreach brief](docs/screenshots/lead-detail.png)
 ![Today's call list](docs/screenshots/today.png)
 
+| Light theme | Phone: leads | Phone: lead detail | Phone: call list |
+|---|---|---|---|
+| <img src="docs/screenshots/light-theme.png" width="380"> | <img src="docs/screenshots/mobile-leads.png" width="180"> | <img src="docs/screenshots/mobile-lead.png" width="180"> | <img src="docs/screenshots/mobile-today.png" width="180"> |
+
 **Submission extras:** [2-minute video script](docs/VIDEO_SCRIPT.md) · [API walkthrough (`.http`)](docs/api-demo.http) ·
 [Business Understanding answers](docs/BUSINESS_UNDERSTANDING.md)
 
@@ -71,9 +75,45 @@ working way to reach anyone. Excluded leads stay visible, but are left out of ex
 * Identifies itself (`LeadLensBot/1.0 (+repo URL)`) and **obeys robots.txt** (RFC 9309: longest match, 5xx = stay out).
 * **Never bypasses CAPTCHAs or bot checks.** Cloudflare, reCAPTCHA, hCaptcha and similar challenges are detected,
   recorded as "Bot check: not bypassed", and the lead keeps its imported data.
+* **Rate limits and IP restrictions are respected, not evaded:** on HTTP 429/503 the crawler honours `Retry-After`
+  once (up to 10 s), otherwise it records "rate limited" and moves on. No proxy rotation, no spoofed browsers.
 * No SMTP mailbox probing (it is abusive and gets IPs blocklisted). Email checks use DNS only.
 * SSRF-safe: every URL and every redirect hop must resolve to a public IP on port 80/443.
 * CSV exports neutralise spreadsheet formula injection (`=`, `+`, `-`, `@`).
+
+### UX design choices
+
+* **One question per screen.** *Leads* answers "who is worth it?", *Today* answers "who do I call now?",
+  *Insights* answers "where should we focus?". Each is one tab, never a settings maze.
+* **Explain every number.** Scores are never shown without reasons: a ring + tier in the table, the top two
+  distinctive reasons in the "Why" column, and the full component breakdown in the lead drawer. Reps trust what
+  they can check, and reviewers can audit the model.
+* **Always say what to do next.** Every lead carries a next action ("Email Ray directly", "Call and ask for Dan",
+  "Follow up by phone on Tue 13 Oct"), so the list can be worked top to bottom without thinking.
+* **Show provenance.** Fields found on the website carry a `web` tag, signals quote the sentence they came from, and
+  email badges say *why* ("Bounces: no mail servers").
+* **Progress, not spinners.** Imports show cleaned rows within a second and a live progress bar while verification
+  and enrichment stream in; nothing blocks the UI.
+* **Keyboard and speed:** `/` focuses search, `j`/`k` move through leads, `Esc` closes panels, and
+  `?lead=<id>` links reopen a lead.
+* **Visual system:** a single gold accent on near-black (the Caprae palette) for primary actions; green, amber, grey
+  and red reserved for tiers A, B, C and X; Inter for legibility in dense tables.
+* **Light, dark or system theme** (◐ / ☀ / ☾ in the top bar), remembered per browser and applied before first paint.
+* **Responsive:** on phones the table becomes cards (score, contact, next step), filters stack, the drawer goes
+  full-screen, and the Today list keeps one-tap *Contacted* / *Replied* buttons. On tablets low-priority columns hide.
+  It prints cleanly: *Insights → Download report* produces a PDF.
+* **Accessible by default:** semantic buttons and labels, `aria-live` toasts, focus outlines, colour never the only
+  signal (tiers also carry a letter).
+
+### How this maps to the evaluation criteria
+
+| Criterion | Where it shows up |
+|---|---|
+| **Business use case** (10) | Acquisition buy box aligned with Caprae's ETA thesis; tiers prioritise high-impact leads; Tier X removes irrelevant ones with a reason; HubSpot / Salesforce / webhook export into existing workflows; Insights turn the list into strategy |
+| **UX/UI** (10) | Guided import → verify → filter → act; plain-English *Ask*; *Today* call list with follow-up automation; next action per lead; keyboard shortcuts; responsive |
+| **Technicality** (10) | Two sources (CSV of any layout + live websites); dedup, enrichment, validation (MX, disposable, role, phone); polite crawler (robots.txt, SSRF guard, bot-check detection, Retry-After); bulk dedup and a 5,000-row benchmark; 33 tests; CI |
+| **Design** (5) | Consistent tokens, tier colours, light/dark themes, cards on mobile, printable report |
+| **Other** (5) | Claude briefs + natural-language search with safe fallbacks; automated reporting; CRM webhook; ethical collection; full docs, API walkthrough, video script |
 
 ---
 
@@ -121,7 +161,7 @@ PostgreSQL (Neon, serverless) in production · H2 file DB locally
 | Caching | Caffeine in-memory: MX results 24 h, robots.txt 6 h, website enrichment 24 h per domain; briefs persisted on the lead | A 2,000-row import touches a few hundred domains, and gmail.com is looked up once |
 | Concurrency | Fixed pool (6 workers) + queue; network I/O outside DB transactions; optimistic locking with retry | Polite to target sites, never blocks the UI, safe against concurrent edits |
 | Performance | Dedup matches pre-loaded with `IN` queries (500 keys each) instead of 1–2 lookups per row; indexes on domain / company key / tier+score / status / follow-up date; pre-score on import | Measured below; rows appear before enrichment finishes, with a progress bar |
-| Hosting (target) | **Render** Docker web service (always-on container, not serverless: the worker pool needs a long-lived process) + **Neon** serverless Postgres; both on **AWS** (us-east) | Simple, cheap, git-push deploys |
+| Hosting (target) | **Render** Docker web service (always-on container, not serverless: the worker pool needs a long-lived process; US region) + **Neon** serverless PostgreSQL (runs on **AWS**, us-east-1). The SPA is static files served by the same container | Simple, cheap, git-push deploys; one origin, no CORS |
 | Deployment | GitHub Actions (Angular build, `mvn verify`, Docker build) → Render auto-deploys `main` from the `Dockerfile` (`render.yaml` blueprint) | Every deploy is tested |
 | Scale-up path | Serve `frontend/` from a CDN (Vercel / S3 + CloudFront) and the API separately | Only needed when traffic justifies two deploys |
 
@@ -163,7 +203,7 @@ docker compose up --build      # app + Postgres 16 on http://localhost:8080
 (`jdbc:postgresql://<host>/<db>?sslmode=require`), `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` and
 optionally `ANTHROPIC_API_KEY`. Flyway creates the schema on first boot. The health check is `/actuator/health`.
 
-**Tests:** `cd backend && mvn test` runs 32 tests: parsing, normalization, verification, robots.txt, extraction,
+**Tests:** `cd backend && mvn test` runs 33 tests: parsing, normalization, verification, robots.txt and Retry-After, extraction,
 scoring, SSRF and export safety, the plain-English query parser (including sanitising model output), follow-up
 scheduling, webhook payloads, an end-to-end import of the sample with insights and the call list, and a scale
 benchmark. All run offline (DNS mocked, crawler off).

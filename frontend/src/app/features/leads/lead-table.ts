@@ -32,7 +32,7 @@ import { ScoreRing } from '../../shared/score-ring';
               <th class="chk"><input type="checkbox" aria-label="Select all on this page" [checked]="allChecked()"
                                      (change)="toggleAll($any($event.target).checked)"></th>
               <th>Score</th><th>Company</th><th class="hide-sm">Owner</th><th>Contact</th>
-              <th class="hide-md">Why</th><th class="hide-sm">Next step</th><th class="hide-md">Status</th>
+              <th class="hide-md">Why</th><th>Next step</th><th class="hide-md">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -42,7 +42,7 @@ import { ScoreRing } from '../../shared/score-ring';
                   <input type="checkbox" [attr.aria-label]="'Select ' + l.company" [checked]="store.selected().has(l.id)"
                          (change)="store.toggleSelected(l.id, $any($event.target).checked)">
                 </td>
-                <td><div class="score"><app-score-ring [score]="l.score" [tier]="l.tier" />
+                <td class="sc"><div class="score"><app-score-ring [score]="l.score" [tier]="l.tier" />
                   <span class="tier" [class]="'tier ' + l.tier">{{ l.tier === 'X' ? '✕' : l.tier }}</span></div></td>
                 <td class="co">
                   <b>{{ l.company }}</b>
@@ -52,7 +52,7 @@ import { ScoreRing } from '../../shared/score-ring';
                 <td class="owner hide-sm">
                   @if (l.ownerName) { <b>{{ l.ownerName }}</b><small>{{ l.ownerTitle }}</small> } @else { <small>Not identified</small> }
                 </td>
-                <td><div class="contact">
+                <td class="ct"><div class="contact">
                   <app-email-badge [status]="l.email ? l.emailStatus : 'MISSING'" />
                   @if (l.phone) {
                     <span class="badge" [class]="'badge ' + (l.phoneValid ? 'good' : 'bad')">{{ l.phoneValid ? '☎ ' + l.phone : 'Bad phone' }}</span>
@@ -62,7 +62,7 @@ import { ScoreRing } from '../../shared/score-ring';
                   @if (l.tier === 'X') { <span class="x">{{ l.excludedReason || 'Excluded' }}</span> }
                   @else { {{ why(l) }} }
                 </td>
-                <td class="next hide-sm"><span class="ch">{{ icon[l.nextAction.channel] }}</span> {{ l.nextAction.label }}</td>
+                <td class="next"><span class="ch">{{ icon[l.nextAction.channel] }}</span> {{ l.nextAction.label }}</td>
                 <td class="hide-md"><span class="status-pill" [class]="'status-pill ' + l.status">{{ statusLabel[l.status] }}</span></td>
               </tr>
             }

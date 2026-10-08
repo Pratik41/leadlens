@@ -37,6 +37,14 @@ class EnrichmentSafetyTest {
     }
 
     @Test
+    void rateLimitsHonourRetryAfter() {
+        assertThat(SafeFetcher.retryAfterMs("3")).isEqualTo(3000);
+        assertThat(SafeFetcher.retryAfterMs(null)).isEqualTo(2000);
+        assertThat(SafeFetcher.retryAfterMs("soon")).isEqualTo(-1);
+        assertThat(SafeFetcher.retryAfterMs("Wed, 21 Oct 2015 07:28:00 GMT")).isZero();
+    }
+
+    @Test
     void botChallengePagesAreRecognised() {
         assertThat(BotChallenge.looksLikeChallenge("<title>Just a moment...</title><div id=cf-chl-widget>")).isTrue();
         assertThat(BotChallenge.looksLikeChallenge("<html><body><h1>Acme Plumbing</h1></body></html>")).isFalse();
