@@ -1,0 +1,17 @@
+# Render blueprint: one Docker web service. The database is a Neon serverless PostgreSQL
+# (set SPRING_DATASOURCE_URL / _USERNAME / _PASSWORD in the Render dashboard).
+services:
+  - type: web
+    name: leadlens
+    runtime: docker
+    plan: starter
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

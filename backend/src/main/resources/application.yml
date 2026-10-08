@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: leadlens
+  datasource:
+    # Local default: an H2 file database in ./data (no install needed).
+    # Production: set SPRING_DATASOURCE_URL / _USERNAME / _PASSWORD to a PostgreSQL database (e.g. Neon).
+    url: jdbc:h2:file:./data/leadlens;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none        # Flyway owns the schema (src/main/resources/db/migration)
+    properties:
+      hibernate.jdbc.batch_size: 100
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/css,application/javascript,text/csv
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+leadlens:
+  import:
+    max-rows: 10000
+  pipeline:
+    threads: 6              # concurrent verification/enrichment workers
+  dns:
+    timeout-ms: 3000
+    fallback-servers: 1.1.1.1,8.8.8.8   # used only when the OS resolver is unusable from Java
+  crawler:
+    enabled: true
+    user-agent: "LeadLensBot/1.0 (+https://github.com/pratiksonkusale/leadlens; reads public company homepages, obeys robots.txt)"
+    robots-token: LeadLensBot
+    timeout-ms: 8000
+    max-bytes: 1500000
+    extra-pages: 2          # about/contact pages read after the homepage
+    delay-ms: 400           # pause between pages of the same site
+  ai:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-opus-5-5
+    fallbacks: true

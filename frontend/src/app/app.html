@@ -1,0 +1,24 @@
+<app-topbar />
+
+<main class="page">
+  @if (store.stats(); as stats) {
+    @if (store.hasLeads()) {
+      @if (stats.latestImport; as batch) { <app-import-banner [batch]="batch" /> }
+      <app-kpis [stats]="stats" />
+      <app-lead-filters />
+      <app-lead-table />
+      <p class="foot">LeadLens reads only public company websites, identifies itself, obeys robots.txt, never solves CAPTCHAs,
+        and never probes mailboxes over SMTP. <button class="link" (click)="reset()">Reset workspace</button></p>
+    } @else {
+      <app-empty-state />
+    }
+  }
+</main>
+
+<app-lead-drawer />
+<app-import-dialog />
+<app-thesis-panel />
+
+@if (toast.message(); as message) {
+  <div class="toast" role="status" aria-live="polite">{{ message }}</div>
+}
