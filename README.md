@@ -2,6 +2,8 @@
 
 SaaSquatch finds companies. LeadLens tells you **which ones to call first, why, how to reach them, and what to say**.
 
+**▶ [Watch the 2-minute walkthrough](https://drive.google.com/file/d/1Z5xSgivaN183J_Gbr9wm1klC5DiZutrD/view?usp=sharing)**
+
 Upload a lead export (or paste a list of websites). In a few seconds LeadLens:
 
 1. **Cleans**: maps any column layout automatically, merges duplicate rows into one company, and reports empty rows and columns it couldn't use.
@@ -28,7 +30,7 @@ On top of the ranked list:
 |---|---|---|---|
 | <img src="docs/screenshots/light-theme.png" width="380"> | <img src="docs/screenshots/mobile-leads.png" width="180"> | <img src="docs/screenshots/mobile-lead.png" width="180"> | <img src="docs/screenshots/mobile-today.png" width="180"> |
 
-**Submission extras:** [2-minute video script](docs/VIDEO_SCRIPT.md) · [API walkthrough (`.http`)](docs/api-demo.http) ·
+**Submission extras:** [walkthrough video](https://drive.google.com/file/d/1Z5xSgivaN183J_Gbr9wm1klC5DiZutrD/view?usp=sharing) · [video script](docs/VIDEO_SCRIPT.md) · [API walkthrough (`.http`)](docs/api-demo.http) ·
 [Business Understanding answers](docs/BUSINESS_UNDERSTANDING.md)
 
 ---
